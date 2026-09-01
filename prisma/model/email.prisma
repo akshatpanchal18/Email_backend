@@ -1,0 +1,44 @@
+model EmailMessage {
+    id String @id @default(uuid())
+
+    mailbox_id String
+
+    message_id     String?
+    from           String
+    to             String
+    subject        String?
+    text           String?
+    html           String?
+    raw_size_bytes Int?
+
+    owner_id String?
+    is_read  Boolean @default(false)
+
+    receivedAt DateTime @default(now())
+    createdAt  DateTime @default(now())
+    expiresAt  DateTime
+
+    mailbox     Mailbox           @relation(fields: [mailbox_id], references: [id], onDelete: Cascade)
+    user        User?             @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+    attachments EmailAttachment[]
+
+    @@index([mailbox_id])
+    @@index([owner_id])
+    @@index([receivedAt])
+    @@index([expiresAt])
+}
+
+model EmailAttachment {
+    id         String @id @default(uuid())
+    message_id String
+
+    filename     String
+    content_type String
+    size         Int
+
+    storageKey String
+
+    email EmailMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
+
+    @@index([message_id])
+}

@@ -1,0 +1,27 @@
+model User {
+    id            String @id @default(uuid())
+    email         String @unique
+    password_hash String
+
+    storage_used_bytes BigInt @default(0)
+
+    is_deleted Boolean   @default(false)
+    deletedAt  DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    email_messages EmailMessage[]
+    mailboxes      Mailbox[]
+    sessions       Session[]
+}
+
+model Session {
+    id        String   @id @default(uuid())
+    user_id   String
+    user      User     @relation(fields: [user_id], references: [id])
+    expiresAt DateTime
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,24 @@
+enum OwnerShip {
+    OWNED
+    GUEST
+}
+
+model Mailbox {
+    id String @id @default(uuid())
+
+    address String @unique
+
+    owner_id          String?
+    status            OwnerShip
+    guest_secret_hash String?
+
+    expiresAt DateTime?
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    user     User?          @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+    messages EmailMessage[]
+
+    @@index([owner_id])
+    @@index([guest_secret_hash])
+}
