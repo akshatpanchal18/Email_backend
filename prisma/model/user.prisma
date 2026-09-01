@@ -17,10 +17,11 @@ model User {
 }
 
 model Session {
-    id        String   @id @default(uuid())
-    user_id   String
-    user      User     @relation(fields: [user_id], references: [id])
-    expiresAt DateTime
+    id          String   @id @default(uuid())
+    user_id     String
+    user        User     @relation(fields: [user_id], references: [id])
+    secret_hash String
+    expiresAt   DateTime
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
