@@ -35,7 +35,6 @@ class MailboxService {
           },
           status: OwnerShip.OWNED,
           guest_secret_hash: null,
-          expiresAt: null,
         });
       }
 
@@ -81,9 +80,6 @@ class MailboxService {
     }
 
     // Guest
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 2);
-
     const secret = await EncryptionService.generateSecret();
     const guest_secret_hash = await PasswordService.hash(secret);
 
@@ -91,7 +87,6 @@ class MailboxService {
       address: mailboxAddress,
       status: OwnerShip.GUEST,
       guest_secret_hash,
-      expiresAt,
     });
 
     const cookie = EncryptionService.generateSessionCookie(
@@ -107,9 +102,6 @@ class MailboxService {
   }
 
   private static async claimAsGuest(mailboxId: string) {
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 2);
-
     const secret = await EncryptionService.generateSecret();
     const guest_secret_hash = await PasswordService.hash(secret);
 
@@ -118,12 +110,10 @@ class MailboxService {
       {
         status: OwnerShip.GUEST,
         guest_secret_hash,
-        expiresAt,
       },
       {
         id: true,
         owner_id: true,
-        expiresAt: true,
         address: true,
         status: true,
         createdAt: true,
@@ -149,7 +139,6 @@ class MailboxService {
       id: true,
       owner_id: true,
       address: true,
-      expiresAt: true,
       status: true,
       createdAt: true,
       updatedAt: true,
@@ -164,7 +153,6 @@ class MailboxService {
       id: true,
       owner_id: true,
       address: true,
-      expiresAt: true,
       status: true,
       createdAt: true,
       updatedAt: true,

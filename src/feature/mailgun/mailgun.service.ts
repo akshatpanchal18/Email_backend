@@ -20,7 +20,6 @@ class MailgunService {
       id: true,
       address: true,
       owner_id: true,
-      expiresAt: true,
       status: true,
     });
 
