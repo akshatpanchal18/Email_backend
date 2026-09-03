@@ -28,11 +28,6 @@ class MailgunService {
       throw new Error("Mailbox not found");
     }
 
-    // 2. Check mailbox expiration
-    if (mailbox.expiresAt && mailbox.expiresAt <= new Date()) {
-      throw new Error("Mailbox expired");
-    }
-
     // 3. Check duplicate
     const existingEmail =
       await EmailMessageRepository.findByMailboxIdAndMessageId(
@@ -46,13 +41,11 @@ class MailgunService {
 
     // 4. Calculate email expiry
     const EMAIL_MESSAGE_EXPIRY_DAYS = 15;
+    const EMAIL_MESSAGE_EXPIRY_HOURS = 2;
 
-    const emailMessageExpiry =
-      mailbox.status === OwnerShip.GUEST
-        ? mailbox.expiresAt!
-        : new Date(
-            Date.now() + EMAIL_MESSAGE_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-          );
+    const emailMessageExpiry = mailbox.owner_id
+      ? new Date(Date.now() + EMAIL_MESSAGE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+      : new Date(Date.now() + EMAIL_MESSAGE_EXPIRY_HOURS * 60 * 60 * 1000);
 
     // 5. Create email
     const email = await EmailMessageRepository.create({
