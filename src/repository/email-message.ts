@@ -34,7 +34,12 @@ class EmailMessageRepository {
     select?: Prisma.EmailMessageSelect,
   ) {
     return prisma.emailMessage.findMany({
-      where: { mailbox_id },
+      where: {
+        mailbox_id,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
       select,
       orderBy: {
         receivedAt: "desc",
