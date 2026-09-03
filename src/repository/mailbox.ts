@@ -96,16 +96,6 @@ class MailboxRepository {
       select: { id: true },
     });
   }
-
-  static deleteExpired() {
-    return prisma.mailbox.deleteMany({
-      where: {
-        expiresAt: {
-          lt: new Date(),
-        },
-      },
-    });
-  }
 }
 
 export default MailboxRepository;
