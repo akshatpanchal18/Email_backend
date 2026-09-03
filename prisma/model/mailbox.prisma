@@ -1,4 +1,5 @@
 enum OwnerShip {
+    NONE
     OWNED
     GUEST
 }
