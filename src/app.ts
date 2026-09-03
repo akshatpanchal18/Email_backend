@@ -20,13 +20,17 @@ import { requestLogger } from "./middleware/request-info";
 import authRoutes from "./feature/auth/auth.routes";
 import mailboxRoutes from "./feature/mailbox/mailbox.routes";
 import mailgunRoutes from "./feature/mailgun/mailgun.routes";
+import { cronjobRoutes } from "./util/cron";
+import { success } from "zod";
 app.use(requestLogger);
-app.get("/", (_req, res) => {
+app.get("/awake", (_req, res) => {
   res.json({
+    success: true,
     message: "Backend is running",
   });
 });
 app.get("/health", checkHealth);
+app.get("/api/v1/cron", cronjobRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/mailbox", mailboxRoutes);
 app.use("/api/v1/mailgun", mailgunRoutes);
