@@ -16,8 +16,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 import { errorMiddleware } from "./middleware/error";
-import authRoutes from "./feature/auth/auth.routes";
 import { requestLogger } from "./middleware/request-info";
+import authRoutes from "./feature/auth/auth.routes";
+import mailboxRoutes from "./feature/mailbox/mailbox.routes";
+import mailgunRoutes from "./feature/mailgun/mailgun.routes";
 app.use(requestLogger);
 app.get("/", (_req, res) => {
   res.json({
@@ -25,7 +27,9 @@ app.get("/", (_req, res) => {
   });
 });
 app.get("/health", checkHealth);
-app.use("/api/v2/auth", authRoutes);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/mailbox", mailboxRoutes);
+app.use("/api/v1/mailgun", mailgunRoutes);
 
 app.use(errorMiddleware);
 export default app;
