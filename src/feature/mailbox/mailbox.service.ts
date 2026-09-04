@@ -1,5 +1,6 @@
 import logger from "../../config/pino";
 import { OwnerShip, User } from "../../generated/prisma/client";
+import { ApiError } from "../../helper/apiError";
 import EmailMessageRepository from "../../repository/email-message";
 import MailboxRepository from "../../repository/mailbox";
 import EncryptionService from "../../service/encryption";
@@ -22,45 +23,44 @@ class MailboxService {
     // =========================================================
 
     if (existingMailbox) {
-      // Guest-owned
-      if (existingMailbox.status === OwnerShip.GUEST) {
-        if (!user?.id) {
-          throw new Error("Mailbox is temporarily taken");
-        }
+      logger.fatal(
+        { existingMailbox: existingMailbox.address },
+        "found existing mailbox",
+      );
 
-        // Guest -> logged-in user
-        return await MailboxRepository.update(existingMailbox.id, {
-          user: {
-            connect: { id: user.id },
-          },
-          status: OwnerShip.OWNED,
-          guest_secret_hash: null,
-        });
-      }
-
-      // User-owned
+      // Owned — always blocked, regardless of who's asking
       if (existingMailbox.status === OwnerShip.OWNED) {
-        if (user?.id && existingMailbox.owner_id === user.id) {
-          return existingMailbox;
-        }
-
-        throw new Error("Mailbox is permanently taken");
+        throw ApiError.validation([
+          {
+            field: "address",
+            message: "Mailbox is permanently taken",
+          },
+        ]);
       }
 
-      // Unowned
+      // Unowned (NONE)
       if (existingMailbox.status === OwnerShip.NONE) {
-        // Logged-in user
+        // Logged-in user claims it
         if (user?.id) {
-          return await MailboxRepository.update(existingMailbox.id, {
-            user: {
-              connect: { id: user.id },
+          return await MailboxRepository.update(
+            existingMailbox.id,
+            {
+              user: { connect: { id: user.id } },
+              status: OwnerShip.OWNED,
             },
-            status: OwnerShip.OWNED,
-          });
+            {
+              id: true,
+              owner_id: true,
+              address: true,
+              status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          );
         }
 
-        // Guest
-        return await this.claimAsGuest(existingMailbox.id);
+        // Guest just gets it back as-is
+        return existingMailbox;
       }
     }
 
@@ -70,46 +70,28 @@ class MailboxService {
 
     // Logged-in user
     if (user?.id) {
-      return await MailboxRepository.create({
-        address: mailboxAddress,
-        status: OwnerShip.OWNED,
-        user: {
-          connect: { id: user.id },
+      return await MailboxRepository.create(
+        {
+          address: mailboxAddress,
+          status: OwnerShip.OWNED,
+          user: { connect: { id: user.id } },
         },
-      });
+        {
+          id: true,
+          owner_id: true,
+          address: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      );
     }
 
     // Guest
-    const secret = await EncryptionService.generateSecret();
-    const guest_secret_hash = await PasswordService.hash(secret);
-
-    const mailbox = await MailboxRepository.create({
-      address: mailboxAddress,
-      status: OwnerShip.GUEST,
-      guest_secret_hash,
-    });
-
-    const cookie = EncryptionService.generateSessionCookie(
-      "g",
-      mailbox.id,
-      secret,
-    );
-
-    return {
-      mailbox,
-      cookie,
-    };
-  }
-
-  private static async claimAsGuest(mailboxId: string) {
-    const secret = await EncryptionService.generateSecret();
-    const guest_secret_hash = await PasswordService.hash(secret);
-
-    const mailbox = await MailboxRepository.update(
-      mailboxId,
+    return await MailboxRepository.create(
       {
-        status: OwnerShip.GUEST,
-        guest_secret_hash,
+        address: mailboxAddress,
+        status: OwnerShip.NONE,
       },
       {
         id: true,
@@ -120,17 +102,6 @@ class MailboxService {
         updatedAt: true,
       },
     );
-
-    const cookie = EncryptionService.generateSessionCookie(
-      "g",
-      mailbox.id,
-      secret,
-    );
-
-    return {
-      mailbox,
-      cookie,
-    };
   }
   static async getMailbox(address: string) {
     const mailboxAddress = `${address}${this.DOMAIN_ADDRESS}`;
