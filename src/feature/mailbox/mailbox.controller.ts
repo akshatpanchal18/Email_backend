@@ -24,7 +24,7 @@ class MailboxController {
 
       return res.status(201).json(
         new ApiResponse(201, "mailbox created", {
-          mailbox: result.mailbox,
+          mailbox: result,
         }),
       );
     }
