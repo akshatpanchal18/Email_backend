@@ -66,7 +66,7 @@ class SessionRepository {
         id,
       },
       data: {
-        revokedAt: new Date(),
+        expiresAt: new Date(),
       },
     });
   }
