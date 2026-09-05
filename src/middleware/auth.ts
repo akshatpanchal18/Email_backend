@@ -1,9 +1,8 @@
 import { NextFunction, Request, Response } from "express";
 import { ApiError } from "../helper/apiError";
+import jwt from "jsonwebtoken";
 import EncryptionService from "../service/encryption";
-import { STATUS } from "../feature/auth/auth.service";
 import UserRepository from "../repository/user";
-import MailboxRepository from "../repository/mailbox";
 import SessionRepository from "../repository/session";
 import PasswordService from "../service/password";
 import logger from "../config/pino";
@@ -38,6 +37,12 @@ class AuthMiddleware {
       req.user = user;
       next();
     } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        return next(
+          ApiError.unauthorized("Access token expired", "TOKEN_EXPIRED"),
+        );
+      }
+
       next(error);
     }
   }
@@ -64,6 +69,11 @@ class AuthMiddleware {
       }
       next();
     } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        return next(
+          ApiError.unauthorized("Access token expired", "TOKEN_EXPIRED"),
+        );
+      }
       next(error);
     }
   }
@@ -76,7 +86,11 @@ class AuthMiddleware {
       const cookie = req.cookies.temp_session;
 
       if (!cookie) {
-        throw ApiError.conflict("no cookie found");
+        return res.status(200).json({
+          status: 200,
+          message: "Guest session",
+        });
+        // throw ApiError.conflict("no cookie found");
       }
 
       const { type, id, secret } =

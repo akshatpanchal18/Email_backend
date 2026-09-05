@@ -1,29 +1,3 @@
-// export class ApiError extends Error {
-//   statusCode: number;
-//   errors: unknown[];
-
-//   constructor(
-//     statusCode = 500,
-//     message = "Internal Server Error",
-//     errors: unknown[] = [],
-//   ) {
-//     super(message);
-
-//     this.statusCode = statusCode;
-//     this.errors = errors;
-
-//     Object.setPrototypeOf(this, ApiError.prototype);
-//     Error.captureStackTrace(this, this.constructor);
-//   }
-
-//   toJSON() {
-//     return {
-//       statusCode: this.statusCode,
-//       message: this.message,
-//       errors: this.errors,
-//     };
-//   }
-// }
 export type ApiErrorItem = {
   field?: string;
   message: string;
@@ -31,17 +5,20 @@ export type ApiErrorItem = {
 };
 
 export class ApiError extends Error {
-  statusCode: number;
+  status: number;
+  statusCode: string;
   errors: ApiErrorItem[];
 
   constructor(
-    statusCode: number,
+    status: number,
+    statusCode: string,
     message: string,
     errors: ApiErrorItem[] = [],
   ) {
     super(message);
 
     this.name = "ApiError";
+    this.status = status;
     this.statusCode = statusCode;
     this.errors = errors;
 
@@ -49,36 +26,48 @@ export class ApiError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 
-  static validation(errors: ApiErrorItem[]) {
-    return new ApiError(400, "Validation failed", errors);
+  static validation(
+    errors: ApiErrorItem[],
+    statusCode = "VALIDATION_ERROR",
+    message = "Validation failed",
+  ) {
+    return new ApiError(400, statusCode, message, errors);
   }
 
-  static badRequest(message = "Bad request") {
-    return new ApiError(400, message);
+  static badRequest(message = "Bad request", statusCode = "BAD_REQUEST") {
+    return new ApiError(400, statusCode, message);
   }
 
-  static unauthorized(message = "Unauthorized") {
-    return new ApiError(401, message);
+  static unauthorized(message = "Unauthorized", statusCode = "UNAUTHORIZED") {
+    return new ApiError(401, statusCode, message);
   }
 
-  static forbidden(message = "Forbidden") {
-    return new ApiError(403, message);
+  static forbidden(message = "Forbidden", statusCode = "FORBIDDEN") {
+    return new ApiError(403, statusCode, message);
   }
 
-  static notFound(message = "Resource not found") {
-    return new ApiError(404, message);
+  static notFound(message = "Resource not found", statusCode = "NOT_FOUND") {
+    return new ApiError(404, statusCode, message);
   }
 
-  static conflict(message = "Resource already exists") {
-    return new ApiError(409, message);
+  static conflict(
+    message = "Resource already exists",
+    statusCode = "CONFLICT",
+  ) {
+    return new ApiError(409, statusCode, message);
   }
 
-  static internal(message = "Internal Server Error") {
-    return new ApiError(500, message);
+  static internal(
+    message = "Internal Server Error",
+    statusCode = "INTERNAL_SERVER_ERROR",
+  ) {
+    return new ApiError(500, statusCode, message);
   }
 
   toJSON() {
     return {
+      success: false,
+      status: this.status,
       statusCode: this.statusCode,
       message: this.message,
       errors: this.errors,

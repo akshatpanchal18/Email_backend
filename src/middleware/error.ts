@@ -19,7 +19,7 @@ export const errorMiddleware = (
   }
 
   if (err instanceof ApiError) {
-    return res.status(err.statusCode).json(err);
+    return res.status(err.status).json(err);
   }
 
   console.error(err);

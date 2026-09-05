@@ -37,10 +37,11 @@ class MailboxController {
     );
   });
   static getMailbox = asyncHandler(async (req: Request, res: Response) => {
+    const user = req.user;
     const address = Array.isArray(req.params.address)
       ? req.params.address[0]!
       : req.params.address!;
-    const mailbox = await MailboxService.getMailbox(address);
+    const mailbox = await MailboxService.getMailbox(address, user?.id);
 
     return res
       .status(200)

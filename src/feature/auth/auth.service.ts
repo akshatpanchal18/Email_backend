@@ -54,6 +54,9 @@ class AuthService {
     const secret_hash = await PasswordService.hash(secret);
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); //30 days
+    const delete_old_session = await SessionRepository.deleteByUserId(
+      find_user.id,
+    );
     const create_session = await SessionRepository.create({
       secret_hash,
       expiresAt,

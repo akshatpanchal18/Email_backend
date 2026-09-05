@@ -10,7 +10,14 @@ import { CreateMailboxInput } from "./mailbox.types";
 
 class MailboxService {
   private static readonly DOMAIN_ADDRESS = process.env.DOMAIN_ADDRESS ?? "";
-
+  private static readonly MailboxFields = {
+    id: true,
+    owner_id: true,
+    address: true,
+    status: true,
+    createdAt: true,
+    updatedAt: true,
+  };
   static async createMailbox(data: CreateMailboxInput, user?: User) {
     const { address } = data;
     const mailboxAddress = `${address}${this.DOMAIN_ADDRESS}`;
@@ -48,14 +55,7 @@ class MailboxService {
               user: { connect: { id: user.id } },
               status: OwnerShip.OWNED,
             },
-            {
-              id: true,
-              owner_id: true,
-              address: true,
-              status: true,
-              createdAt: true,
-              updatedAt: true,
-            },
+            this.MailboxFields,
           );
         }
 
@@ -76,14 +76,7 @@ class MailboxService {
           status: OwnerShip.OWNED,
           user: { connect: { id: user.id } },
         },
-        {
-          id: true,
-          owner_id: true,
-          address: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        this.MailboxFields,
       );
     }
 
@@ -93,27 +86,52 @@ class MailboxService {
         address: mailboxAddress,
         status: OwnerShip.NONE,
       },
-      {
-        id: true,
-        owner_id: true,
-        address: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      this.MailboxFields,
     );
   }
-  static async getMailbox(address: string) {
+  static async getMailbox(address: string, userId?: string) {
     const mailboxAddress = `${address}${this.DOMAIN_ADDRESS}`;
 
-    const find_mailbox = await MailboxRepository.findByAddress(mailboxAddress, {
-      id: true,
-      owner_id: true,
-      address: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
-    });
+    const find_mailbox = await MailboxRepository.findByAddress(
+      mailboxAddress,
+      this.MailboxFields,
+    );
+    if (!find_mailbox) {
+      // Authenticated user:
+      // requested mailbox doesn't exist, so return their mailbox.
+      if (userId) {
+        return await MailboxRepository.findByUserId(userId, this.MailboxFields);
+      }
+
+      // Guest:
+      // requested mailbox doesn't exist, so create it.
+      return await MailboxRepository.create(
+        {
+          address: mailboxAddress,
+          status: OwnerShip.NONE,
+        },
+        this.MailboxFields,
+      );
+    }
+
+    // Mailbox exists and is owned
+    if (find_mailbox.status === OwnerShip.OWNED) {
+      // No user → cannot access private mailbox
+      if (!userId) {
+        throw ApiError.unauthorized(
+          "Authentication required",
+          "MAILBOX_ACCESS_DENIED",
+        );
+      }
+
+      // Mailbox belongs to another user
+      if (find_mailbox.owner_id !== userId) {
+        return await MailboxRepository.findByUserId(userId, this.MailboxFields);
+      }
+      // Owned by current user → return requested mailbox
+      return find_mailbox;
+    }
+    // Mailbox is not owned → accessible
     return find_mailbox;
   }
   static async getMyMailbox(user: User) {
