@@ -61,12 +61,13 @@ class SessionRepository {
   }
 
   static revokeById(id: string) {
-    return prisma.session.update({
+    return prisma.session.updateMany({
       where: {
         id,
+        is_expired: false,
       },
       data: {
-        expiresAt: new Date(),
+        is_expired: true,
       },
     });
   }

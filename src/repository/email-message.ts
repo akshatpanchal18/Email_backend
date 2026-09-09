@@ -160,6 +160,13 @@ class EmailMessageRepository {
       },
     });
   }
+  static deleteManyByMailboxId(id: string) {
+    return prisma.emailMessage.deleteMany({
+      where: {
+        mailbox_id: id,
+      },
+    });
+  }
 }
 
 export default EmailMessageRepository;
