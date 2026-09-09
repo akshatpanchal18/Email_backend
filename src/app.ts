@@ -14,6 +14,7 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.set("trust proxy", 1);
 
 import { errorMiddleware } from "./middleware/error";
 import { requestLogger } from "./middleware/request-info";
@@ -21,7 +22,8 @@ import authRoutes from "./feature/auth/auth.routes";
 import mailboxRoutes from "./feature/mailbox/mailbox.routes";
 import mailgunRoutes from "./feature/mailgun/mailgun.routes";
 import { cronjobRoutes } from "./util/cron";
-import { success } from "zod";
+import { requestMeta } from "./middleware/request-meta";
+app.use(requestMeta);
 app.use(requestLogger);
 app.get("/awake", (_req, res) => {
   res.json({
