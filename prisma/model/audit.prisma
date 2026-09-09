@@ -1,0 +1,22 @@
+model AuditLog {
+    id         String      @id @default(uuid())
+    mailboxId  String
+    mailbox    Mailbox     @relation(fields: [mailboxId], references: [id])
+    userId     String?
+    action     AuditAction
+    ipAddress  String
+    userAgent  String
+    deviceInfo Json?
+    createdAt  DateTime    @default(now())
+
+    @@index([mailboxId])
+    @@index([createdAt])
+}
+
+enum AuditAction {
+    MAILBOX_CREATED
+    MAILBOX_CLAIMED
+    MAILBOX_ACCESSED
+    MAILBOX_DELETED
+    MAILBOX_RELEASED
+}

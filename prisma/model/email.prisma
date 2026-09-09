@@ -32,6 +32,7 @@ model EmailAttachment {
     id         String @id @default(uuid())
     message_id String
 
+    url          String
     filename     String
     content_type String
     size         Int
