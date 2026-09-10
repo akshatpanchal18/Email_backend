@@ -1,11 +1,17 @@
 import logger from "../../config/pino";
-import { OwnerShip, User } from "../../generated/prisma/client";
+import {
+  AuditAction,
+  MailboxStatus,
+  OwnerShip,
+  User,
+} from "../../generated/prisma/client";
 import { ApiError } from "../../helper/apiError";
 import EmailMessageRepository from "../../repository/email-message";
 import MailboxRepository from "../../repository/mailbox";
 import EncryptionService from "../../service/encryption";
 import PasswordService from "../../service/password";
 import SocketService from "../../service/socket";
+import AuditLogService from "../audit-log/audit-log.service";
 import { CreateMailboxInput } from "./mailbox.types";
 
 class MailboxService {
@@ -13,123 +19,116 @@ class MailboxService {
   private static readonly MailboxFields = {
     id: true,
     owner_id: true,
+    prefix: true,
     address: true,
     status: true,
     createdAt: true,
     updatedAt: true,
   };
-  static async createMailbox(data: CreateMailboxInput, user?: User) {
-    const { address } = data;
-    const mailboxAddress = `${address}${this.DOMAIN_ADDRESS}`;
+  // Guest, new name → create PUBLIC
+  // Guest, existing PUBLIC → return it, log accessed
+  // Guest, existing PRIVATE → rejected
+  // User already owns one → rejected
+  // User, new name → create PRIVATE
+  // User, existing PUBLIC → wipe messages, claim it, PRIVATE
+  // User, existing PRIVATE → rejected
+  static async createMailbox(
+    data: CreateMailboxInput,
+    meta: { ip: string; userAgent: string; deviceInfo?: object },
+    user?: User,
+  ) {
+    const { address } = data; // rename from `address` — this is just the username part, not the full email
+    const fullAddress = `${address}${this.DOMAIN_ADDRESS}`;
 
-    const existingMailbox =
-      await MailboxRepository.findByAddress(mailboxAddress);
+    const existing = await MailboxRepository.findByPrefix(address);
 
-    // =========================================================
-    // MAILBOX EXISTS
-    // =========================================================
-
-    if (existingMailbox) {
-      logger.fatal(
-        { existingMailbox: existingMailbox.address },
-        "found existing mailbox",
-      );
-
-      // Owned — always blocked, regardless of who's asking
-      if (existingMailbox.status === OwnerShip.OWNED) {
-        throw ApiError.validation([
-          {
-            field: "address",
-            message: "Mailbox is permanently taken",
-          },
-        ]);
+    // ---------- Guest ----------
+    if (!user) {
+      if (!existing) {
+        const mailbox = await MailboxRepository.create({
+          prefix: address,
+          address: fullAddress,
+          status: MailboxStatus.PUBLIC,
+        });
+        await AuditLogService.log({
+          mailboxId: mailbox.id,
+          action: AuditAction.MAILBOX_CREATED,
+          ...meta,
+        });
+        return mailbox;
       }
 
-      // Unowned (NONE)
-      if (existingMailbox.status === OwnerShip.NONE) {
-        // Logged-in user claims it
-        if (user?.id) {
-          return await MailboxRepository.update(
-            existingMailbox.id,
-            {
-              user: { connect: { id: user.id } },
-              status: OwnerShip.OWNED,
-            },
-            this.MailboxFields,
-          );
-        }
-
-        // Guest just gets it back as-is
-        return existingMailbox;
+      if (existing.status === MailboxStatus.PUBLIC) {
+        await AuditLogService.log({
+          mailboxId: existing.id,
+          action: AuditAction.MAILBOX_ACCESSED,
+          ...meta,
+        });
+        return existing;
       }
+
+      throw ApiError.conflict("This name is already taken");
     }
 
-    // =========================================================
-    // MAILBOX DOES NOT EXIST
-    // =========================================================
-
-    // Logged-in user
-    if (user?.id) {
-      return await MailboxRepository.create(
-        {
-          address: mailboxAddress,
-          status: OwnerShip.OWNED,
-          user: { connect: { id: user.id } },
-        },
-        this.MailboxFields,
+    // ---------- Logged-in user ----------
+    const ownsOne = await MailboxRepository.existsByOwnerId(user.id);
+    // check for user already have or not
+    if (ownsOne) {
+      throw ApiError.conflict(
+        "You already have a mailbox. Delete or release it before creating another.",
       );
     }
+    // if email not exist
+    if (!existing) {
+      const mailbox = await MailboxRepository.create({
+        prefix: address,
+        address: fullAddress,
+        status: MailboxStatus.PRIVATE,
+        user: { connect: { id: user.id } },
+      });
+      await AuditLogService.log({
+        mailboxId: mailbox.id,
+        action: AuditAction.MAILBOX_CREATED,
+        userId: user.id,
+        ...meta,
+      });
+      return mailbox;
+    }
+    // if exist then check status
+    if (existing.status === MailboxStatus.PRIVATE) {
+      throw ApiError.conflict("This name is already taken");
+    }
 
-    // Guest
-    return await MailboxRepository.create(
+    // existing.status === "PUBLIC" → implicit claim
+    await EmailMessageRepository.deleteManyByMailboxId(existing.id);
+    // TODO: also purge this mailbox's attachments from Cloudinary — DB cascade won't touch them
+
+    const claimed = await MailboxRepository.update(
+      existing.id,
       {
-        address: mailboxAddress,
-        status: OwnerShip.NONE,
+        status: MailboxStatus.PRIVATE,
+        user: { connect: { id: user.id } },
       },
       this.MailboxFields,
     );
+    await AuditLogService.log({
+      mailboxId: claimed.id,
+      action: AuditAction.MAILBOX_CLAIMED,
+      userId: user.id,
+      ...meta,
+    });
+    return claimed;
   }
-  static async getMailbox(address: string, userId?: string) {
-    const mailboxAddress = `${address}${this.DOMAIN_ADDRESS}`;
-
-    const find_mailbox = await MailboxRepository.findByAddress(
-      mailboxAddress,
+  static async getMailbox(id: string) {
+    const find_mailbox = await MailboxRepository.findById(
+      id,
       this.MailboxFields,
     );
     if (!find_mailbox) {
-      // Authenticated user:
-      // requested mailbox doesn't exist, so return their mailbox.
-      if (userId) {
-        return await MailboxRepository.findByUserId(userId, this.MailboxFields);
-      }
-
-      // Guest:
-      // requested mailbox doesn't exist, so create it.
-      return await MailboxRepository.create(
-        {
-          address: mailboxAddress,
-          status: OwnerShip.NONE,
-        },
-        this.MailboxFields,
-      );
+      throw ApiError.conflict("invalid req");
     }
-
-    // Mailbox exists and is owned
-    if (find_mailbox.status === OwnerShip.OWNED) {
-      // No user → cannot access private mailbox
-      if (!userId) {
-        throw ApiError.unauthorized(
-          "Authentication required",
-          "MAILBOX_ACCESS_DENIED",
-        );
-      }
-
-      // Mailbox belongs to another user
-      if (find_mailbox.owner_id !== userId) {
-        return await MailboxRepository.findByUserId(userId, this.MailboxFields);
-      }
-      // Owned by current user → return requested mailbox
-      return find_mailbox;
+    if (find_mailbox?.status === MailboxStatus.PRIVATE) {
+      throw ApiError.forbidden("mailbox is private");
     }
     // Mailbox is not owned → accessible
     return find_mailbox;
@@ -138,14 +137,10 @@ class MailboxService {
     const { id } = user;
     // logger.info({id})
 
-    const mailbox = await MailboxRepository.findByUserId(id, {
-      id: true,
-      owner_id: true,
-      address: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
-    });
+    const mailbox = await MailboxRepository.findByOwnerId(
+      id,
+      this.MailboxFields,
+    );
     // logger.info({mailbox})
 
     return Array.isArray(mailbox) ? mailbox : mailbox ? [mailbox] : [];
