@@ -1,5 +1,4 @@
 import logger from "../../config/pino";
-import { OwnerShip } from "../../generated/prisma/enums";
 import EmailMessageRepository from "../../repository/email-message";
 import MailboxRepository from "../../repository/mailbox";
 import SocketService from "../../service/socket";

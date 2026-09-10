@@ -25,6 +25,12 @@ class MailboxRepository {
       select,
     });
   }
+  static findByAddress(address: string, select?: Prisma.MailboxSelect) {
+    return prisma.mailbox.findFirst({
+      where: { address },
+      select,
+    });
+  }
   static findByOwnerId(id: string, select?: Prisma.MailboxSelect) {
     return prisma.mailbox.findFirst({
       where: { owner_id: id },

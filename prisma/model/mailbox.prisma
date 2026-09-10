@@ -1,9 +1,3 @@
-enum OwnerShip {
-    NONE
-    OWNED
-    GUEST
-}
-
 enum MailboxStatus {
     PUBLIC
     PRIVATE

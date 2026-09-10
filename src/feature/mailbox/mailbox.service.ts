@@ -2,14 +2,11 @@ import logger from "../../config/pino";
 import {
   AuditAction,
   MailboxStatus,
-  OwnerShip,
   User,
 } from "../../generated/prisma/client";
 import { ApiError } from "../../helper/apiError";
 import EmailMessageRepository from "../../repository/email-message";
 import MailboxRepository from "../../repository/mailbox";
-import EncryptionService from "../../service/encryption";
-import PasswordService from "../../service/password";
 import SocketService from "../../service/socket";
 import AuditLogService from "../audit-log/audit-log.service";
 import { CreateMailboxInput } from "./mailbox.types";
