@@ -43,6 +43,8 @@ class SocketService {
     }
 
     const room = `mailbox:${mailboxId}`;
+    const clientCount = this.io.sockets.adapter.rooms.get(room)?.size ?? 0;
+    logger.info({ room, event, clientCount }, "emitting to room");
     this.io.to(room).emit(event, data);
   }
 }
