@@ -8,7 +8,7 @@ const router = Router();
 
 router.post("/signup", validate(createUserSchema), AuthController.createUser);
 router.post("/login", validate(loginUserSchema), AuthController.loginUser);
-router.get(
+router.post(
   "/logout",
   AuthMiddleware.validateSession,
   AuthController.logoutUser,

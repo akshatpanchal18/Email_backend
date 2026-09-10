@@ -8,7 +8,10 @@ class AuthController {
   private static readonly cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "none" as const,
+    sameSite:
+      process.env.NODE_ENV === "production"
+        ? ("none" as const)
+        : ("lax" as const),
     path: "/",
     maxAge: 30 * 24 * 60 * 60 * 1000, //30 days
   };
