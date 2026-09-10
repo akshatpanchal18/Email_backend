@@ -9,12 +9,12 @@ router.post(
   AuthMiddleware.optionalToken,
   MailboxController.createMailbox,
 );
-router.get("/mailbox/:address", MailboxController.getMailbox);
 router.get(
   "/my-mailboxes",
   AuthMiddleware.validateAccessToken,
   MailboxController.getMyMailbox,
 );
+router.get("/:id", MailboxController.getMailbox);
 router.get("/my-messages/:mailboxId", MailboxController.getEmailMessages);
 router.patch(
   "/:mailboxId/messages/:messageId/read",

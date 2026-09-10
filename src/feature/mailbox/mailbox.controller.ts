@@ -5,49 +5,38 @@ import { ApiResponse } from "../../helper/apiResponse";
 import logger from "../../config/pino";
 
 class MailboxController {
-  static readonly guestCookieOption = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge: 2 * 60 * 60 * 1000,
-  };
   static createMailbox = asyncHandler(async (req: Request, res: Response) => {
     const data = req.body;
     const user = req.user;
+    const meta = req.meta;
+    const meta_data = {
+      ip: meta.ip ?? "unknown",
+      userAgent: meta.userAgent,
+      deviceInfo: meta.device,
+    };
 
-    const result = await MailboxService.createMailbox(data, user);
+    const mailbox = await MailboxService.createMailbox(data, meta_data, user);
 
     // Guest mailbox
-    if ("cookie" in result) {
-      res.cookie("temp_session", result.cookie, this.guestCookieOption);
-
-      return res.status(201).json(
-        new ApiResponse(201, "mailbox created", {
-          mailbox: result,
-        }),
-      );
-    }
-
-    // Logged-in user mailbox
     return res.status(201).json(
       new ApiResponse(201, "mailbox created", {
-        mailbox: result,
+        mailbox,
       }),
     );
   });
   static getMailbox = asyncHandler(async (req: Request, res: Response) => {
-    const user = req.user;
-    const address = Array.isArray(req.params.address)
-      ? req.params.address[0]!
-      : req.params.address!;
-    const mailbox = await MailboxService.getMailbox(address, user?.id);
+    const id = Array.isArray(req.params.id)
+      ? req.params.id[0]!
+      : req.params.id!;
+    logger.info({ id }, "HIT: getMailbox");
+    const mailbox = await MailboxService.getMailbox(id);
 
     return res
       .status(200)
       .json(new ApiResponse(200, "mailbox retrieved", { mailbox }));
   });
   static getMyMailbox = asyncHandler(async (req: Request, res: Response) => {
+    logger.info("HIT: getMyMailbox");
     const user = req.user!;
     // logger.info({ user });
     const mailbox = await MailboxService.getMyMailbox(user);

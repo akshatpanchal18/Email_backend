@@ -21,12 +21,12 @@ class EncryptionService {
   static generateSecret() {
     return crypto.randomBytes(32).toString("hex");
   }
-  static generateSessionCookie(type: "u" | "g", id: string, secret: string) {
-    return `${type}.${id}.${secret}`;
+  static generateSessionCookie(id: string, secret: string) {
+    return `${id}.${secret}`;
   }
   static decryptSessionCookie(cookie: string) {
-    const [type, id, secret] = cookie.split(".");
-    return { type, id, secret };
+    const [id, secret] = cookie.split(".");
+    return { id, secret };
   }
 }
 export default EncryptionService;

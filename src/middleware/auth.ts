@@ -86,54 +86,33 @@ class AuthMiddleware {
       const cookie = req.cookies.temp_session;
 
       if (!cookie) {
-        return res.status(200).json({
-          status: 200,
-          message: "Guest session",
-        });
-        // throw ApiError.conflict("no cookie found");
-      }
-
-      const { type, id, secret } =
-        await EncryptionService.decryptSessionCookie(cookie);
-
-      if (type === "g") {
-        return res.status(200).json({
-          status: 200,
-          message: "Guest session",
-        });
-      }
-
-      if (type === "u") {
-        const session = await SessionRepository.findById(id);
-
-        if (!session) {
-          throw ApiError.unauthorized("Session not found");
-        }
-
-        if (session.expiresAt < new Date()) {
-          throw ApiError.unauthorized("Session expired");
-        }
-
-        const isValid = await PasswordService.compare(
-          secret,
-          session.secret_hash!,
-        );
-
-        if (!isValid) {
-          throw ApiError.unauthorized("Invalid session");
-        }
-
-        req.session = session;
-
+        req.session = undefined;
         return next();
       }
 
-      return res.status(200).json({
-        status: 200,
-        message: "Unknown session type",
-      });
+      const { id, secret } =
+        await EncryptionService.decryptSessionCookie(cookie);
+      const session = await SessionRepository.findById(id);
+
+      const isValid =
+        session &&
+        !session.is_expired &&
+        session.expiresAt > new Date() &&
+        (await PasswordService.compare(secret, session.secret_hash!));
+
+      if (!isValid) {
+        res.clearCookie("temp_session");
+        req.session = undefined;
+        return next();
+      }
+
+      req.session = session;
+      next();
     } catch (error) {
-      next(error);
+      // malformed/tampered cookie — treat as no session, don't crash the request
+      res.clearCookie("temp_session");
+      req.session = undefined;
+      next();
     }
   }
 }

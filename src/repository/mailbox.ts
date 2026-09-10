@@ -19,21 +19,20 @@ class MailboxRepository {
     });
   }
 
-  static findByAddress(address: string, select?: Prisma.MailboxSelect) {
+  static findByPrefix(prefix: string, select?: Prisma.MailboxSelect) {
     return prisma.mailbox.findUnique({
-      where: { address },
+      where: { prefix },
+      select,
+    });
+  }
+  static findByOwnerId(id: string, select?: Prisma.MailboxSelect) {
+    return prisma.mailbox.findFirst({
+      where: { owner_id: id },
       select,
     });
   }
 
-  static findByUserId(owner_id: string, select?: Prisma.MailboxSelect) {
-    return prisma.mailbox.findMany({
-      where: { owner_id },
-      select,
-    });
-  }
-
-  static findByIdAndUserId(
+  static findByIdAndOwnerId(
     id: string,
     owner_id: string,
     select?: Prisma.MailboxSelect,
@@ -47,15 +46,15 @@ class MailboxRepository {
     });
   }
 
-  static findByIdAndAddress(
+  static findByIdAndPrefix(
     id: string,
-    address: string,
+    prefix: string,
     select?: Prisma.MailboxSelect,
   ) {
     return prisma.mailbox.findFirst({
       where: {
         id,
-        address,
+        prefix,
       },
       select,
     });
@@ -71,13 +70,18 @@ class MailboxRepository {
     });
   }
 
-  static existsByAddress(address: string) {
+  static existsByPrefix(prefix: string) {
     return prisma.mailbox.findUnique({
-      where: { address },
+      where: { prefix },
       select: { id: true },
     });
   }
-
+  static existsByOwnerId(owner_id: string) {
+    return prisma.mailbox.findFirst({
+      where: { owner_id },
+      select: { id: true },
+    });
+  }
   static update(
     id: string,
     data: Prisma.MailboxUpdateInput,
@@ -90,10 +94,9 @@ class MailboxRepository {
     });
   }
 
-  static delete(id: string) {
-    return prisma.mailbox.delete({
-      where: { id },
-      select: { id: true },
+  static deleteManyByMailboxId(mailbox_id: string) {
+    return prisma.emailMessage.deleteMany({
+      where: { mailbox_id },
     });
   }
 }

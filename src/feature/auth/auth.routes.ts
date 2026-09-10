@@ -13,9 +13,10 @@ router.get(
   AuthMiddleware.validateSession,
   AuthController.logoutUser,
 );
-router.get(
-  "/restore",
-  AuthMiddleware.validateSession,
-  AuthController.restoreSession,
-);
+// router.get(
+//   "/restore",
+//   AuthMiddleware.validateSession,
+//   AuthController.restoreSession,
+// );
+router.get("/init", AuthMiddleware.validateSession, AuthController.initialize);
 export default router;
