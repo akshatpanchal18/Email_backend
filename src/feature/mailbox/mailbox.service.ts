@@ -73,6 +73,15 @@ class MailboxService {
     if (ownsOne) {
       throw ApiError.conflict(
         "You already have a mailbox. Delete or release it before creating another.",
+        "MAILBOX_ALREADY_EXISTS",
+        [
+          {
+            field: "address",
+            message:
+              "You already have a mailbox. Delete or release it before creating another.",
+            code: "MAILBOX_ALREADY_EXISTS",
+          },
+        ],
       );
     }
     // if email not exist
@@ -93,7 +102,13 @@ class MailboxService {
     }
     // if exist then check status
     if (existing.status === MailboxStatus.PRIVATE) {
-      throw ApiError.conflict("This name is already taken");
+      throw ApiError.conflict("This name is already taken", "NAME_TAKEN", [
+        {
+          field: "address",
+          message: "This name is already taken",
+          code: "NAME_TAKEN",
+        },
+      ]);
     }
 
     // existing.status === "PUBLIC" → implicit claim

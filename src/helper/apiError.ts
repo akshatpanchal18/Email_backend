@@ -53,8 +53,9 @@ export class ApiError extends Error {
   static conflict(
     message = "Resource already exists",
     statusCode = "CONFLICT",
+    errors: ApiErrorItem[] = [],
   ) {
-    return new ApiError(409, statusCode, message);
+    return new ApiError(409, statusCode, message, errors);
   }
 
   static internal(
