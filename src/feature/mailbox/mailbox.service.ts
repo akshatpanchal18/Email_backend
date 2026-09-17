@@ -1,9 +1,5 @@
 import logger from "../../config/pino";
-import {
-  AuditAction,
-  MailboxStatus,
-  User,
-} from "../../generated/prisma/client";
+import { AuditAction, MailboxStatus, User } from "../../generated/prisma/client";
 import { ApiError } from "../../helper/apiError";
 import EmailMessageRepository from "../../repository/email-message";
 import MailboxRepository from "../../repository/mailbox";
@@ -29,11 +25,7 @@ class MailboxService {
   // User, new name → create PRIVATE
   // User, existing PUBLIC → wipe messages, claim it, PRIVATE
   // User, existing PRIVATE → rejected
-  static async createMailbox(
-    data: CreateMailboxInput,
-    meta: { ip: string; userAgent: string; deviceInfo?: object },
-    user?: User,
-  ) {
+  static async createMailbox(data: CreateMailboxInput, meta: { ip: string; userAgent: string; deviceInfo?: object }, user?: User) {
     const { address } = data; // rename from `address` — this is just the username part, not the full email
     const fullAddress = `${address}${this.DOMAIN_ADDRESS}`;
 
@@ -71,18 +63,13 @@ class MailboxService {
     const ownsOne = await MailboxRepository.existsByOwnerId(user.id);
     // check for user already have or not
     if (ownsOne) {
-      throw ApiError.conflict(
-        "You already have a mailbox. Delete or release it before creating another.",
-        "MAILBOX_ALREADY_EXISTS",
-        [
-          {
-            field: "address",
-            message:
-              "You already have a mailbox. Delete or release it before creating another.",
-            code: "MAILBOX_ALREADY_EXISTS",
-          },
-        ],
-      );
+      throw ApiError.conflict("You already have a mailbox. Delete or release it before creating another.", "MAILBOX_ALREADY_EXISTS", [
+        {
+          field: "address",
+          message: "You already have a mailbox. Delete or release it before creating another.",
+          code: "MAILBOX_ALREADY_EXISTS",
+        },
+      ]);
     }
     // if email not exist
     if (!existing) {
@@ -132,10 +119,7 @@ class MailboxService {
     return claimed;
   }
   static async getMailbox(id: string) {
-    const find_mailbox = await MailboxRepository.findById(
-      id,
-      this.MailboxFields,
-    );
+    const find_mailbox = await MailboxRepository.findById(id, this.MailboxFields);
     if (!find_mailbox) {
       throw ApiError.conflict("invalid req");
     }
@@ -149,15 +133,12 @@ class MailboxService {
     const { id } = user;
     // logger.info({id})
 
-    const mailbox = await MailboxRepository.findByOwnerId(
-      id,
-      this.MailboxFields,
-    );
+    const mailbox = await MailboxRepository.findByOwnerId(id, this.MailboxFields);
     // logger.info({mailbox})
 
     return Array.isArray(mailbox) ? mailbox : mailbox ? [mailbox] : [];
   }
-  static async getEmailMessages(mailboxId: string) {
+  static async getEmailMessages(mailboxId: string, page: number, limit: number) {
     const mailbox = await MailboxRepository.findById(mailboxId, {
       id: true,
     });
@@ -166,21 +147,26 @@ class MailboxService {
       throw new Error("Mailbox not found");
     }
 
-    return EmailMessageRepository.findByMailboxId(mailbox.id, {
-      id: true,
-      message_id: true,
-      from: true,
-      to: true,
-      subject: true,
-      text: true,
-      html: true,
-      raw_size_bytes: true,
-      is_read: true,
-      receivedAt: true,
-      expiresAt: true,
-      createdAt: true,
-      attachments: true,
-    });
+    return EmailMessageRepository.findByMailboxId(
+      mailbox.id,
+      {
+        id: true,
+        message_id: true,
+        from: true,
+        to: true,
+        subject: true,
+        text: true,
+        html: true,
+        raw_size_bytes: true,
+        is_read: true,
+        receivedAt: true,
+        expiresAt: true,
+        createdAt: true,
+        attachments: true,
+      },
+      page,
+      limit,
+    );
   }
   static async markMessageAsRead(mailboxId: string, messageId: string) {
     const message = await EmailMessageRepository.findById(messageId, {

@@ -2,10 +2,7 @@ import { prisma } from "../config/prisma";
 import { Prisma } from "../generated/prisma/client";
 
 class EmailMessageRepository {
-  static create(
-    data: Prisma.EmailMessageCreateInput,
-    select?: Prisma.EmailMessageSelect,
-  ) {
+  static create(data: Prisma.EmailMessageCreateInput, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.create({
       data,
       select,
@@ -19,32 +16,66 @@ class EmailMessageRepository {
     });
   }
 
-  static findByMessageId(
-    message_id: string,
-    select?: Prisma.EmailMessageSelect,
-  ) {
+  static findByMessageId(message_id: string, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.findFirst({
       where: { message_id },
       select,
     });
   }
 
-  static findByMailboxId(
-    mailbox_id: string,
-    select?: Prisma.EmailMessageSelect,
-  ) {
-    return prisma.emailMessage.findMany({
-      where: {
-        mailbox_id,
-        expiresAt: {
-          gt: new Date(),
+  // static findByMailboxId(
+  //   mailbox_id: string,
+  //   select?: Prisma.EmailMessageSelect,
+  // ) {
+  //   return prisma.emailMessage.findMany({
+  //     where: {
+  //       mailbox_id,
+  //       expiresAt: {
+  //         gt: new Date(),
+  //       },
+  //     },
+  //     select,
+  //     orderBy: {
+  //       receivedAt: "desc",
+  //     },
+  //   });
+  // }
+  static async findByMailboxId(mailbox_id: string, select: Prisma.EmailMessageSelect, page: number, limit: number) {
+    const skip = (page - 1) * limit;
+
+    const [messages, total] = await Promise.all([
+      prisma.emailMessage.findMany({
+        where: {
+          mailbox_id,
         },
+        select,
+        skip,
+        take: limit,
+        orderBy: {
+          receivedAt: "desc",
+        },
+      }),
+
+      prisma.emailMessage.count({
+        where: {
+          mailbox_id,
+        },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      messages,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
       },
-      select,
-      orderBy: {
-        receivedAt: "desc",
-      },
-    });
+    };
   }
 
   static findByOwnerId(owner_id: string, select?: Prisma.EmailMessageSelect) {
@@ -57,11 +88,7 @@ class EmailMessageRepository {
     });
   }
 
-  static findByIdAndMailboxId(
-    id: string,
-    mailbox_id: string,
-    select?: Prisma.EmailMessageSelect,
-  ) {
+  static findByIdAndMailboxId(id: string, mailbox_id: string, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.findFirst({
       where: {
         id,
@@ -70,11 +97,7 @@ class EmailMessageRepository {
       select,
     });
   }
-  static findByMailboxIdAndMessageId(
-    mailbox_id: string,
-    message_id: string,
-    select?: Prisma.EmailMessageSelect,
-  ) {
+  static findByMailboxIdAndMessageId(mailbox_id: string, message_id: string, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.findFirst({
       where: {
         mailbox_id,
@@ -83,11 +106,7 @@ class EmailMessageRepository {
       select,
     });
   }
-  static findByIdAndOwnerId(
-    id: string,
-    owner_id: string,
-    select?: Prisma.EmailMessageSelect,
-  ) {
+  static findByIdAndOwnerId(id: string, owner_id: string, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.findFirst({
       where: {
         id,
@@ -97,10 +116,7 @@ class EmailMessageRepository {
     });
   }
 
-  static findMany(
-    where: Prisma.EmailMessageWhereInput = {},
-    select?: Prisma.EmailMessageSelect,
-  ) {
+  static findMany(where: Prisma.EmailMessageWhereInput = {}, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.findMany({
       where,
       select,
@@ -110,11 +126,7 @@ class EmailMessageRepository {
     });
   }
 
-  static update(
-    id: string,
-    data: Prisma.EmailMessageUpdateInput,
-    select?: Prisma.EmailMessageSelect,
-  ) {
+  static update(id: string, data: Prisma.EmailMessageUpdateInput, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.update({
       where: { id },
       data,
