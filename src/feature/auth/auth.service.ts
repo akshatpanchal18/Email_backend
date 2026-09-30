@@ -7,7 +7,6 @@ import EncryptionService from "../../service/encryption";
 import PasswordService from "../../service/password";
 import { CreateUserInput, LoginUserInput } from "./auth.types";
 
-export const STATUS = { USER: "user", GUEST: "guest" };
 class AuthService {
   static async createUser(data: CreateUserInput) {
     const { email, password } = data;
@@ -31,10 +30,7 @@ class AuthService {
         },
       },
     });
-    const cookie = EncryptionService.generateSessionCookie(
-      create_session.id,
-      secret,
-    );
+    const cookie = EncryptionService.generateSessionCookie(create_session.id, secret);
     return {
       token,
       cookie,
@@ -48,12 +44,8 @@ class AuthService {
       if (!find_user) {
         throw ApiError.notFound("user not found");
       }
-      const is_password_valid = await PasswordService.compare(
-        password,
-        find_user.password_hash,
-      );
-      if (!is_password_valid)
-        throw ApiError.unauthorized("invalid credentials");
+      const is_password_valid = await PasswordService.compare(password, find_user.password_hash);
+      if (!is_password_valid) throw ApiError.unauthorized("invalid credentials");
       // access token
       const token = await EncryptionService.generateAccessToken(find_user.id);
       // secret generation
@@ -72,10 +64,7 @@ class AuthService {
       });
       // revoke old session
       await SessionRepository.revokeById(find_user.id);
-      const cookie = EncryptionService.generateSessionCookie(
-        create_session.id,
-        secret,
-      );
+      const cookie = EncryptionService.generateSessionCookie(create_session.id, secret);
       return {
         token,
         cookie,
@@ -91,18 +80,11 @@ class AuthService {
     await SessionRepository.deleteById(id);
     return { deleted: true };
   }
-  // static async restoreSession(session: Session) {
-  //   // logger.info({ session });
-  //   const { user_id } = session;
-  //   if (session) {
-  //     const token = await EncryptionService.generateAccessToken(user_id);
-  //     return {
-  //       type: STATUS.USER,
-  //       token,
-  //     };
-  //   }
-  //   throw ApiError.unauthorized("invalid session");
-  // }
+  static async getProfile(userId: string) {
+    const user = await UserRepository.getProfile(userId);
+    if (!user) throw ApiError.notFound("User not found");
+    return user;
+  }
   static async initialize(session: Session) {
     const user = await UserRepository.findById(session.user_id);
 

@@ -8,15 +8,7 @@ const router = Router();
 
 router.post("/signup", validate(createUserSchema), AuthController.createUser);
 router.post("/login", validate(loginUserSchema), AuthController.loginUser);
-router.post(
-  "/logout",
-  AuthMiddleware.validateSession,
-  AuthController.logoutUser,
-);
-// router.get(
-//   "/restore",
-//   AuthMiddleware.validateSession,
-//   AuthController.restoreSession,
-// );
+router.post("/logout", AuthMiddleware.validateSession, AuthController.logoutUser);
+router.get("/my-details", AuthMiddleware.validateAccessToken, AuthController.getProfile);
 router.get("/init", AuthMiddleware.validateSession, AuthController.initialize);
 export default router;
