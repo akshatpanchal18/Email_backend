@@ -1,6 +1,7 @@
 import logger from "../../config/pino";
 import { AuditAction, MailboxStatus, User } from "../../generated/prisma/client";
 import { ApiError } from "../../helper/apiError";
+import EmailAttachmentRepository from "../../repository/email-attachment";
 import EmailMessageRepository from "../../repository/email-message";
 import MailboxRepository from "../../repository/mailbox";
 import SocketService from "../../service/socket";
@@ -196,6 +197,14 @@ class MailboxService {
     });
 
     return updated;
+  }
+  static async getAttachments(userId: string, mailboxId: string, page: number, limit: number) {
+    const [items, total, sum] = await EmailAttachmentRepository.findByUser(userId, {
+      mailboxId,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return { items, total, sum };
   }
 }
 

@@ -53,6 +53,25 @@ class MailboxController {
 
     return res.status(200).json(new ApiResponse(200, "message marked as read", { message }));
   });
+  // controller
+  static getAttachments = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const mailboxId = Array.isArray(req.params.mailboxId) ? req.params.mailboxId[0]! : req.params.mailboxId!;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 20);
+
+    const { items, total, sum } = await MailboxService.getAttachments(userId, mailboxId, page, limit);
+
+    return res.status(200).json(
+      new ApiResponse(200, "fetched successfully", {
+        items,
+        total,
+        totalBytes: sum._sum.size ?? 0,
+        page,
+        limit,
+      }),
+    );
+  });
 }
 
 export default MailboxController;

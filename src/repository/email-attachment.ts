@@ -45,7 +45,33 @@ class EmailAttachmentRepository {
       select,
     });
   }
+  static findByUser(userId: string, opts: { mailboxId?: string; skip?: number; take?: number } = {}) {
+    const where: Prisma.EmailAttachmentWhereInput = {
+      email: {
+        owner_id: userId,
+        ...(opts.mailboxId ? { mailbox_id: opts.mailboxId } : {}),
+      },
+    };
 
+    return prisma.$transaction([
+      prisma.emailAttachment.findMany({
+        where,
+        select: {
+          id: true,
+          filename: true,
+          content_type: true,
+          size: true,
+          url: true,
+          email: { select: { id: true, subject: true, mailbox_id: true } },
+        },
+        orderBy: { size: "desc" }, // biggest first, useful for a storage view
+        skip: opts.skip ?? 0,
+        take: opts.take ?? 20,
+      }),
+      prisma.emailAttachment.count({ where }),
+      prisma.emailAttachment.aggregate({ where, _sum: { size: true } }),
+    ]);
+  }
   static findByStorageKey(storageKey: string, select?: Prisma.EmailAttachmentSelect) {
     return prisma.emailAttachment.findFirst({
       where: {
