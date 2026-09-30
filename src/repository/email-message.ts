@@ -202,6 +202,33 @@ class EmailMessageRepository {
       },
     });
   }
+  static findExpiredBatch(take: number, excludeIds: string[] = []) {
+    return prisma.emailMessage.findMany({
+      where: {
+        expiresAt: { lte: new Date() },
+        ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
+      },
+      select: {
+        id: true,
+        owner_id: true,
+        attachments: { select: { storageKey: true, resource_type: true, size: true } },
+      },
+      orderBy: { expiresAt: "asc" },
+      take,
+    });
+  }
+
+  static deleteBatch(ids: string[], storageByUser: Map<string, number>) {
+    return prisma.$transaction([
+      prisma.emailMessage.deleteMany({ where: { id: { in: ids } } }), // attachments cascade
+      ...[...storageByUser].map(([userId, bytes]) =>
+        prisma.user.update({
+          where: { id: userId },
+          data: { storage_used_bytes: { decrement: BigInt(bytes) } },
+        }),
+      ),
+    ]);
+  }
 }
 
 export default EmailMessageRepository;
