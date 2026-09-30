@@ -8,6 +8,7 @@ import { MailgunInboundWebhookInput } from "./mailgun.types";
 
 type ResourceType = "image" | "video" | "raw";
 
+const MAX_USER_STORAGE_BYTES = 200n * 1024n * 1024n; // 200 MB
 class MailgunService {
   static async handleInboundEmail(data: MailgunInboundWebhookInput, files: Express.Multer.File[] = []) {
     const recipient = data.recipient.split(",")[0].trim().toLowerCase();
@@ -74,22 +75,25 @@ class MailgunService {
       }));
 
       // 6. Create email + attachments in one go
-      const email = await EmailMessageRepository.createWithAttachments({
-        mailbox: { connect: { id: mailbox.id } },
+      const email = await EmailMessageRepository.createWithAttachments(
+        {
+          mailbox: { connect: { id: mailbox.id } },
 
-        ...(mailbox.owner_id ? { user: { connect: { id: mailbox.owner_id } } } : {}),
+          ...(mailbox.owner_id ? { user: { connect: { id: mailbox.owner_id } } } : {}),
 
-        message_id: messageId,
-        from: data.from ?? data.sender,
-        to: recipient,
-        subject: data.subject ?? null,
-        text: data["body-plain"] ?? null,
-        html: data["body-html"] ?? null,
-        raw_size_bytes: data["Content-Length"] ? Number(data["Content-Length"]) : null,
-        expiresAt: emailMessageExpiry,
+          message_id: messageId,
+          from: data.from ?? data.sender,
+          to: recipient,
+          subject: data.subject ?? null,
+          text: data["body-plain"] ?? null,
+          html: data["body-html"] ?? null,
+          raw_size_bytes: data["Content-Length"] ? Number(data["Content-Length"]) : null,
+          expiresAt: emailMessageExpiry,
 
-        ...(attachmentRows.length ? { attachments: { create: attachmentRows } } : {}),
-      });
+          ...(attachmentRows.length ? { attachments: { create: attachmentRows } } : {}),
+        },
+        mailbox.owner_id && totalBytes > 0 ? { userId: mailbox.owner_id, bytes: BigInt(totalBytes), max: MAX_USER_STORAGE_BYTES } : undefined,
+      );
 
       // 7. Push to client
       SocketService.emitToMailbox(mailbox.id, "new_message", email);

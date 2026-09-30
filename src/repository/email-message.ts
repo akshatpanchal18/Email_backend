@@ -9,10 +9,27 @@ class EmailMessageRepository {
     });
   }
   // repository
-  static createWithAttachments(data: Prisma.EmailMessageCreateInput) {
-    return prisma.emailMessage.create({
-      data,
-      include: { attachments: true },
+  static createWithAttachments(data: Prisma.EmailMessageCreateInput, quota?: { userId: string; bytes: bigint; max: bigint }) {
+    return prisma.$transaction(async (tx) => {
+      if (quota && quota.bytes > 0n) {
+        // only increments if it stays under the max, atomically
+        const { count } = await tx.user.updateMany({
+          where: {
+            id: quota.userId,
+            storage_used_bytes: { lte: quota.max - quota.bytes },
+          },
+          data: { storage_used_bytes: { increment: quota.bytes } },
+        });
+
+        if (count === 0) {
+          throw new Error("Storage quota exceeded");
+        }
+      }
+
+      return tx.emailMessage.create({
+        data,
+        include: { attachments: true },
+      });
     });
   }
   static findById(id: string, select?: Prisma.EmailMessageSelect) {
