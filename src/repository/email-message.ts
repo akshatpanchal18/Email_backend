@@ -8,7 +8,13 @@ class EmailMessageRepository {
       select,
     });
   }
-
+  // repository
+  static createWithAttachments(data: Prisma.EmailMessageCreateInput) {
+    return prisma.emailMessage.create({
+      data,
+      include: { attachments: true },
+    });
+  }
   static findById(id: string, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.findUnique({
       where: { id },
