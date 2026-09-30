@@ -37,7 +37,8 @@ model EmailAttachment {
     content_type String
     size         Int
 
-    storageKey String
+    storageKey    String
+    resource_type String @default("raw")
 
     email EmailMessage @relation(fields: [message_id], references: [id], onDelete: Cascade)
 
