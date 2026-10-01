@@ -32,7 +32,7 @@ app.get("/awake", (_req, res) => {
   });
 });
 app.get("/health", checkHealth);
-app.get("/api/v1/cron", cronjobRoutes);
+app.use("/api/v1/cron", cronjobRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/mailbox", mailboxRoutes);
 app.use("/api/v1/mailgun", mailgunRoutes);
