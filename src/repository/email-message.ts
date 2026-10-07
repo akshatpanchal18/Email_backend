@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma";
 import { Prisma } from "../generated/prisma/client";
 
+export class ConcurrentDeleteError extends Error {}
 class EmailMessageRepository {
   static create(data: Prisma.EmailMessageCreateInput, select?: Prisma.EmailMessageSelect) {
     return prisma.emailMessage.create({
@@ -228,6 +229,56 @@ class EmailMessageRepository {
         }),
       ),
     ]);
+  }
+
+  /**
+   * Deletes messages matching `where` (attachments cascade) and decrements
+   * each owner's storage_used_bytes by exactly the attachment bytes removed.
+   * Everything is one transaction. Returns the attachments for storage cleanup.
+   */
+  static deleteWithQuota(where: Prisma.EmailMessageWhereInput, take?: number) {
+    return prisma.$transaction(
+      async (tx) => {
+        const messages = await tx.emailMessage.findMany({
+          where,
+          take,
+          select: {
+            id: true,
+            owner_id: true,
+            attachments: { select: { storageKey: true, resource_type: true, size: true } },
+          },
+        });
+
+        if (messages.length === 0) return { count: 0, attachments: [] as { storageKey: string; resource_type: string }[] };
+
+        const ids = messages.map((m) => m.id);
+        const { count } = await tx.emailMessage.deleteMany({ where: { id: { in: ids } } });
+
+        // someone else deleted some of these between our read and delete -> roll back,
+        // otherwise we'd decrement bytes we didn't actually free
+        if (count !== ids.length) throw new ConcurrentDeleteError();
+
+        const bytesByUser = new Map<string, bigint>();
+        for (const m of messages) {
+          if (!m.owner_id) continue; // guest mail was never charged to a quota
+          const bytes = m.attachments.reduce((sum, a) => sum + BigInt(a.size), 0n);
+          if (bytes > 0n) bytesByUser.set(m.owner_id, (bytesByUser.get(m.owner_id) ?? 0n) + bytes);
+        }
+
+        for (const [userId, bytes] of bytesByUser) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { storage_used_bytes: { decrement: bytes } },
+          });
+        }
+
+        return {
+          count,
+          attachments: messages.flatMap((m) => m.attachments),
+        };
+      },
+      { timeout: 15_000 },
+    );
   }
 }
 

@@ -1,6 +1,7 @@
 import { UploadApiResponse } from "cloudinary";
 import cloudinary from "../config/cloudinary";
 
+export type CloudinaryResourceType = "image" | "raw" | "video";
 class CloudinaryService {
   static uploadBuffer(
     buffer: Buffer,

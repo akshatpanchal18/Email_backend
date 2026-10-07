@@ -3,6 +3,7 @@ import asyncHandler from "../../helper/asyncHandler";
 import MailboxService from "./mailbox.service";
 import { ApiResponse } from "../../helper/apiResponse";
 import logger from "../../config/pino";
+import { bulkDeleteSchema, messageIdParamSchema } from "./mailbox.schema";
 
 class MailboxController {
   static createMailbox = asyncHandler(async (req: Request, res: Response) => {
@@ -71,6 +72,22 @@ class MailboxController {
         limit,
       }),
     );
+  });
+  static deleteEmailMessage = asyncHandler(async (req: Request, res: Response) => {
+    const { messageId } = messageIdParamSchema.parse(req.params);
+    await MailboxService.deleteEmailMessage(req.user!.id, messageId);
+    return res.status(200).json(new ApiResponse(200, "deleted successfully"));
+  });
+
+  static deleteEmailMessages = asyncHandler(async (req: Request, res: Response) => {
+    const { messageIds } = bulkDeleteSchema.parse(req.body);
+    const result = await MailboxService.deleteEmailMessages(req.user!.id, messageIds);
+    return res.status(200).json(new ApiResponse(200, `${result.deleted} deleted`));
+  });
+
+  static emptyInbox = asyncHandler(async (req: Request, res: Response) => {
+    const result = await MailboxService.emptyInbox(req.user!.id);
+    return res.status(200).json(new ApiResponse(200, `inbox emptied (${result.deleted})`));
   });
 }
 

@@ -1,9 +1,10 @@
 import logger from "../../config/pino";
-import { AuditAction, MailboxStatus, User } from "../../generated/prisma/client";
+import { AuditAction, MailboxStatus, Prisma, User } from "../../generated/prisma/client";
 import { ApiError } from "../../helper/apiError";
 import EmailAttachmentRepository from "../../repository/email-attachment";
-import EmailMessageRepository from "../../repository/email-message";
+import EmailMessageRepository, { ConcurrentDeleteError } from "../../repository/email-message";
 import MailboxRepository from "../../repository/mailbox";
+import CloudinaryService from "../../service/cloudinary";
 import SocketService from "../../service/socket";
 import AuditLogService from "../audit-log/audit-log.service";
 import { CreateMailboxInput } from "./mailbox.types";
@@ -205,6 +206,70 @@ class MailboxService {
       take: limit,
     });
     return { items, total, sum };
+  }
+  // MailboxService
+  private static ownedBy(userId: string): Prisma.EmailMessageWhereInput {
+    return { OR: [{ owner_id: userId }, { mailbox: { owner_id: userId } }] };
+  }
+
+  // best-effort: DB is the source of truth, a failed Cloudinary call only orphans a file
+  private static async purgeFiles(attachments: { storageKey: string; resource_type: string }[]) {
+    const results = await Promise.allSettled(attachments.map((a) => CloudinaryService.delete(a.storageKey, a.resource_type as "image" | "raw" | "video")));
+    results.forEach((r, i) => {
+      if (r.status === "rejected") {
+        console.error("Cloudinary delete failed", attachments[i]!.storageKey, r.reason);
+      }
+    });
+  }
+
+  static async deleteEmailMessage(userId: string, messageId: string) {
+    return this.deleteEmailMessages(userId, [messageId]);
+  }
+
+  static async deleteEmailMessages(userId: string, messageIds: string[]) {
+    const where: Prisma.EmailMessageWhereInput = {
+      id: { in: messageIds },
+      ...this.ownedBy(userId),
+    };
+
+    let result;
+    try {
+      result = await EmailMessageRepository.deleteWithQuota(where);
+    } catch (e) {
+      if (e instanceof ConcurrentDeleteError) {
+        throw ApiError.conflict("Messages changed while deleting, please retry");
+      }
+      throw e;
+    }
+
+    if (result.count === 0) throw ApiError.notFound("No messages found");
+
+    await this.purgeFiles(result.attachments);
+    return { deleted: result.count };
+  }
+
+  static async emptyInbox(userId: string) {
+    const mailbox = await MailboxRepository.findByOwnerId(userId, { id: true });
+    if (!mailbox) throw ApiError.notFound("Mailbox not found");
+
+    const BATCH = 100;
+    let total = 0;
+    let conflicts = 0;
+
+    // batches keep each transaction small for big inboxes
+    while (true) {
+      try {
+        const { count, attachments } = await EmailMessageRepository.deleteWithQuota({ mailbox_id: mailbox.id }, BATCH);
+        if (count === 0) break;
+        total += count;
+        await this.purgeFiles(attachments);
+      } catch (e) {
+        if (e instanceof ConcurrentDeleteError && ++conflicts <= 5) continue; // re-read and retry
+        throw e;
+      }
+    }
+
+    return { deleted: total };
   }
 }
 
